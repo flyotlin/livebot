@@ -276,7 +276,7 @@ def train():
             loss = model(X, Y, T)
             loss.backward()
             optim.step()
-            report_loss += loss.data[0]
+            report_loss += loss.data.item()
             n_samples += len(X.data)
             count += 1
             if count % opt.report == 0 or count == total:
@@ -308,7 +308,7 @@ def eval(dev_set, model):
         X = Variable(X, volatile=True).cuda()
         Y = Variable(Y, volatile=True).cuda()
         T = Variable(T, volatile=True).cuda()
-        loss += model(X, Y, T).data[0]
+        loss += model(X, Y, T).data.item()
 
     print(loss)
     print("evaluting time:", time.time() - start_time)
