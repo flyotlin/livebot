@@ -37,8 +37,9 @@ class CNN(nn.Module):
         return self.img_encoder(X).squeeze(3).squeeze(2)
 
     def forward(self, X):
+        with torch.no_grad():
         X = self.img_to_tensor(X)
-        X = Variable(X, volatile=True).unsqueeze(0).cuda()
+            X = X.unsqueeze(0).cuda()
         return self.encode(X).squeeze(0).data
 
 

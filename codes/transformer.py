@@ -124,13 +124,14 @@ class Model(nn.Module):
         out_text = self.encode_text(T, out_img)
 
         ys = torch.ones(X.size(0), 1).long()
-        for i in range(opt.max_len):
-            out = self.decode(Variable(ys, volatile=True).cuda(), out_img, out_text,
-                              Variable(subsequent_mask(ys.size(0), ys.size(1))))
-            prob = out[:, -1]
-            _, next_word = torch.max(prob, dim=-1, keepdim=True)
-            next_word = next_word.data
-            ys = torch.cat([ys, next_word], dim=-1)
+        with torch.no_grad():
+            for i in range(opt.max_len):
+                out = self.decode(ys.cuda(), out_img, out_text,
+                                Variable(subsequent_mask(ys.size(0), ys.size(1))))
+                prob = out[:, -1]
+                _, next_word = torch.max(prob, dim=-1, keepdim=True)
+                next_word = next_word.data
+                ys = torch.cat([ys, next_word], dim=-1)
 
         return ys[:, 1:]
 
@@ -303,12 +304,13 @@ def eval(dev_set, model):
     dev_batch = get_dataloader(dev_set, opt.batch_size, is_train=False)
 
     loss = 0
-    for batch in dev_batch:
-        X, Y, T = batch
-        X = Variable(X, volatile=True).cuda()
-        Y = Variable(Y, volatile=True).cuda()
-        T = Variable(T, volatile=True).cuda()
-        loss += model(X, Y, T).data.item()
+    with torch.zero_grad():
+        for batch in dev_batch:
+            X, Y, T = batch
+            X = X.cuda()
+            Y = Y.cuda()
+            T = T.cuda()
+            loss += model(X, Y, T).data.item()
 
     print(loss)
     print("evaluting time:", time.time() - start_time)
@@ -322,21 +324,22 @@ def test(test_set, model):
     model.eval()
     predictions, references = [], []
 
-    for i in range(len(test_set)):
-        X, Y, T, data = test_set.get_img_and_candidate(i)
-        X = Variable(X, volatile=True).cuda()
-        Y = Variable(Y, volatile=True).cuda()
-        T = Variable(T, volatile=True).cuda()
-        ids = model.ranking(X, Y, T).data
+    with torch.no_grad():
+        for i in range(len(test_set)):
+            X, Y, T, data = test_set.get_img_and_candidate(i)
+            X = X.cuda()
+            Y = Y.cuda()
+            T = T.cuda()
+            ids = model.ranking(X, Y, T).data
 
-        candidate = []
-        comments = list(data['candidate'].keys())
-        for id in ids:
-            candidate.append(comments[id])
-        predictions.append(candidate)
-        references.append(data['candidate'])
-        if i % 100 == 0:
-            print(i)
+            candidate = []
+            comments = list(data['candidate'].keys())
+            for id in ids:
+                candidate.append(comments[id])
+            predictions.append(candidate)
+            references.append(data['candidate'])
+            if i % 100 == 0:
+                print(i)
 
     recall_1 = recall(predictions, references, 1)
     recall_5 = recall(predictions, references, 5)
